@@ -439,6 +439,16 @@ letExprs =
       )
       (pairs defs)
 
+guardTerms :: [(Text, Expr)]
+guardTerms =
+  [ ( "| a -> b | otherwise -> c",
+      Guard [(Name "a", Name "b")] (Name "c")
+    ),
+    ( "| a -> | b -> c | otherwise -> d | otherwise -> e",
+      Guard [(Name "a", Guard [(Name "b", Name "c")] (Name "d"))] (Name "e")
+    )
+  ]
+
 exprs :: [Text]
 exprs =
   fmap fst appExprs
@@ -447,6 +457,7 @@ exprs =
     ++ fmap fst letExprs
     ++ fmap fst caseExprs
     ++ fmap fst lambdaTerms
+    ++ fmap fst guardTerms
 
 noEmpty :: Parser a -> SpecWith (Arg (IO ()))
 noEmpty parser =
@@ -651,8 +662,14 @@ main = hspec $ do
       lambdaTerm `notParsing` exprs \\ map fst lambdaTerms
     it "correctly parses lambdas" $ do
       lambdaTerm `parsing` lambdaTerms
+  describe "Lamb.Parser.guardTerm" $ do
+    noEmpty guardTerm
+    it "rejects non-guards" $ do
+      guardTerm `notParsing` exprs \\ map fst guardTerms
+    it "correctly parses guards" $ do
+      guardTerm `parsing` guardTerms
 
--- TODO: guardTerm, do-while, while-do
+-- TODO: do-while, while-do
 
 -- describe "Lamb.Parser.expr" $ do
 --   it "correctly parses various expressions" $ do
