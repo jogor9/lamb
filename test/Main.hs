@@ -230,7 +230,7 @@ lists =
 
 rangeLists :: [(Text, Expr)]
 rangeLists =
-  [ ("[-1..]", RangeList (Numeral (-1)) Nothing Nothing),
+  [ ("[-1..]", RangeList (UMinus (Numeral 1)) Nothing Nothing),
     ("[45,46..]", RangeList (Numeral 45) (Just $ Numeral 46) Nothing),
     ( "[\"foo\".. bar]",
       RangeList (StringLiteral "foo") Nothing $ Just $ Name "bar"
