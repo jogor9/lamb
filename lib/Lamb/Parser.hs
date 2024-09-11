@@ -321,6 +321,7 @@ parensTerm :: Parser Expr
 parensTerm =
   parens $
     P.label "lambda" (P.try (Lambda <$> (LambdaDef <$> lamArgs <* arrow <*> expr)))
+      P.<|> (P.try (anyOperator <* P.lookAhead (P.char ')')) <&> \op -> Hole `op` Hole)
       P.<|> ( (,)
                 <$> expr
                 <*> ( Right
@@ -334,7 +335,6 @@ parensTerm =
                   Left l -> return (foldr1 Tuple $ h :| l) P.<?> "tuple"
                   Right op -> return (h `op` Hole) P.<?> "section"
             )
-      P.<|> (anyOperator <&> \op -> Hole `op` Hole)
       P.<|> P.label "unit" (return Unit)
 
 keywords :: HashSet Text

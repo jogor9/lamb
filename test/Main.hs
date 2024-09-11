@@ -270,6 +270,12 @@ tuples =
     ("(a, b, c)", Tuple (Name "a") $ Tuple (Name "b") (Name "c"))
   ]
 
+preOps :: [(Text, Expr)]
+preOps =
+  [ ("(++)", Concatenation Hole Hole),
+    ("(   <|  )", RevPipe Hole Hole)
+  ]
+
 sections :: [(Text, Expr)]
 sections =
   [ ("(a+)", Name "a" `Plus` Hole),
@@ -279,7 +285,7 @@ sections =
   ]
 
 parenTerms :: [Text]
-parenTerms = units ++ map fst (parenExprs ++ tuples ++ sections)
+parenTerms = units ++ map fst (parenExprs ++ tuples ++ sections ++ preOps)
 
 terms :: [Text]
 terms =
@@ -511,6 +517,8 @@ main = hspec $ do
       parensTerm `parsing` parenExprs
     it "parses tuples" $ do
       parensTerm `parsing` tuples
+    it "parses prefix-form operators" $ do
+      parensTerm `parsing` preOps
     it "parses postfix sections" $ do
       parensTerm `parsing` sections
   describe "Lamb.Parser.appTerm" $ do
@@ -553,6 +561,44 @@ main = hspec $ do
       caseTerm `notParsing` (terms ++ exprs) \\ fmap fst caseExprs
     it "correctly parses case expressions" $ do
       caseTerm `parsing` caseExprs
+  describe "Lamb.parser.expr" $ do
+    noEmpty expr
+    it "correctly parses binary operators" $ do
+      parse expr "1 + 1" `shouldReturn` Plus (Numeral 1) (Numeral 1)
+    it "correctly parses operator associativity" $ do
+      parse expr "2 ^ 5 ^ 6" `shouldReturn` Power (Numeral 2) (Power (Numeral 5) (Numeral 6))
+    it "correctly parses unary minus" $ do
+      parse expr "-2^4" `shouldReturn` UMinus (Power (Numeral 2) (Numeral 4))
+    it "correctly parses operator precedence" $ do
+      parse expr "2 * -3 + 5" `shouldReturn` Plus (Times (Numeral 2) (UMinus (Numeral 3))) (Numeral 5)
+    it "correctly parses non-associative `member of` operator" $ do
+      parse expr "a ? 3" `shouldReturn` MemberOf (Name "a") (Numeral 3)
+      parse expr "a ? 3 ? 2" `shouldThrow` anyIOException
+    it "correctly parses prefix sections" $ do
+      parse expr "+2" `shouldReturn` Plus Hole (Numeral 2)
+      parse expr "+ 2 * 5" `shouldReturn` Plus Hole (Times (Numeral 2) (Numeral 5))
+      parse expr "+ 3 - 2" `shouldReturn` Plus Hole (Minus (Numeral 3) (Numeral 2))
+      parse expr "* 2 + 2" `shouldReturn` Times Hole (Plus (Numeral 2) (Numeral 2))
+      parse expr "x |> + 42" `shouldReturn` Pipe (Name "x") (Plus Hole (Numeral 42))
+      parse expr "a ? b ?> ? c ?> ? d" `shouldReturn` Bind (Bind (MemberOf (Name "a") (Name "b")) (MemberOf Hole (Name "c"))) (MemberOf Hole (Name "d"))
+    it "correctly parses complex pipelines" $ do
+      -- data |>    (sort &> group &> map length &> sum
+      --         <&> find "val" &> || 42               ) |> uncurry (==)
+      parse expr "data |> (sort &> group &> map length &> sum <&> find \"val\" &> || 42) |> uncurry (==)"
+        `shouldReturn` ( Pipe
+                           (Name "data")
+                           ( Compose
+                               ( Compose
+                                   (Compose (Name "sort") (Name "group"))
+                                   (Application (Name "map") [Name "length"])
+                               )
+                               (Name "sum")
+                               `Parallel` Compose
+                                 (Application (Name "find") [StringLiteral "val"])
+                                 (Alternation Hole (Numeral 42))
+                           )
+                           `Pipe` Application (Name "uncurry") [Equals Hole Hole]
+                       )
 
 -- describe "Lamb.Parser.expr" $ do
 --   it "correctly parses various expressions" $ do
