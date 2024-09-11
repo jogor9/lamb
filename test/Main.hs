@@ -343,6 +343,38 @@ pairs =
 defs :: [(Text, Def)]
 defs = fmap (\(t, d) -> (t <> " = e", Def d $ Name "e")) decls
 
+caseExprs :: [(Text, Expr)]
+caseExprs =
+  [ ( "case a -> b -> c; _ -> d",
+      Case
+        (Name "a")
+        [ (Pattern Nothing (Name "b") Nothing, Name "c"),
+          (Pattern Nothing Hole Nothing, Name "d")
+        ]
+    ),
+    ( "case a -> b | c -> d; e -> f",
+      Case
+        (Name "a")
+        [ (Pattern Nothing (Name "b") $ Just (Name "c"), Name "d"),
+          (Pattern Nothing (Name "e") Nothing, Name "f")
+        ]
+    ),
+    ( "case a -> b -> c -> d; e -> f",
+      Case
+        (Name "a")
+        [ (Pattern (Just (Name "b")) (Name "c") Nothing, Name "d"),
+          (Pattern Nothing (Name "e") Nothing, Name "f")
+        ]
+    ),
+    ( "case a -> b -> c | g -> d; e -> f",
+      Case
+        (Name "a")
+        [ (Pattern (Just (Name "b")) (Name "c") (Just (Name "g")), Name "d"),
+          (Pattern Nothing (Name "e") Nothing, Name "f")
+        ]
+    )
+  ]
+
 -- do decl first then test on every pair of decl tests
 letExprs :: [(Text, Expr)]
 letExprs =
@@ -515,6 +547,12 @@ main = hspec $ do
       letTerm `notParsing` (terms ++ exprs) \\ fmap fst letExprs
     it "correctly parses let expressions" $ do
       letTerm `parsing` letExprs
+  describe "Lamb.Parser.caseTerm" $ do
+    noEmpty caseTerm
+    it "rejects non-cases" $ do
+      caseTerm `notParsing` (terms ++ exprs) \\ fmap fst caseExprs
+    it "correctly parses case expressions" $ do
+      caseTerm `parsing` caseExprs
 
 -- describe "Lamb.Parser.expr" $ do
 --   it "correctly parses various expressions" $ do
