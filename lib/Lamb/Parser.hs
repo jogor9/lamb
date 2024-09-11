@@ -315,6 +315,8 @@ anyOperator =
         ("?", MemberOf)
       ]
 
+-- TODO: postfix sections (maybe write your own expression parser)
+
 parensTerm :: Parser Expr
 parensTerm =
   parens $
