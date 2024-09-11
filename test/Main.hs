@@ -205,8 +205,8 @@ rawStrings :: [(Text, Expr)]
 rawStrings =
   fmap
     (second StringLiteral)
-    [ ( "\"\"\" multiline string\\n \"\" \" \"\" \\r \\t \\e\"\"\"",
-        " multiline string\n \"\" \" \"\" \r \t \x1b"
+    [ ( "\"\"\" multiline string\n \"\" \" \"\" \r \t \"\"\"",
+        " multiline string\n \"\" \" \"\" \r \t "
       )
     ]
 
