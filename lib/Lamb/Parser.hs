@@ -195,7 +195,7 @@ numeral =
             >> ( \case
                    0 -> \_ _ -> 0
                    int -> \frac expo ->
-                     fst . fromRationalRepetendUnlimited $
+                     fromRational $
                        (int `shiftL` (4 * length frac) .|. unsafeReadHex frac)
                          `shiftL` abs expo
                          % 1 `shiftL` (4 * length frac + max 0 (-expo))
