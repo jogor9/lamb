@@ -375,11 +375,10 @@ hole =
       <$ P.char '_'
       <* P.takeWhileP Nothing (\x -> isAlphaNum x || x == '_')
 
-simpleTerm :: Parser Expr
-simpleTerm =
+primaryTerm :: Parser Expr
+primaryTerm =
   P.choice
     [ name,
-      parensTerm,
       hole,
       numeral,
       list,
@@ -390,14 +389,17 @@ simpleTerm =
       charLiteral
     ]
 
+singleTerm :: Parser Expr
+singleTerm = primaryTerm P.<|> parensTerm
+
 appTerm :: Parser Expr
 appTerm =
   ( \f -> \case
       Just xs -> Application f xs
       Nothing -> f
   )
-    <$> simpleTerm
-    <*> ( (Just <$> P.some simpleTerm P.<?> "application")
+    <$> singleTerm
+    <*> ( (Just <$> P.some singleTerm P.<?> "application")
             P.<|> return Nothing
         )
 
@@ -512,8 +514,8 @@ declItem nm =
     <$> nm
     <*> P.optional
       ( colon
-          *> ( P.try (braces pattern)
-                 P.<|> ((\t -> Pattern Nothing t Nothing) <$> term)
+          *> ( parens pattern
+                 P.<|> ((\t -> Pattern Nothing t Nothing) <$> primaryTerm)
              )
       )
     P.<?> "name declaration"

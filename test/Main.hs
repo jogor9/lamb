@@ -506,7 +506,7 @@ main = hspec $ do
   describe "lamb.Parser.def" $ do
     noEmpty def
     it "rejects non-definitions" $ do
-      def `notParsing` exprs ++ terms
+      def `notParsing` (exprs ++ terms) \\ fmap fst defs
     it "correctly parses definitions" $ do
       def `parsing` defs
   describe "Lamb.Parser.letTerm" $ do
