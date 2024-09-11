@@ -320,7 +320,7 @@ anyOperator =
 parensTerm :: Parser Expr
 parensTerm =
   parens $
-    P.label "lambda" (P.try (Lambda <$> (LambdaDef <$> lamArgs <* arrow <*> expr)))
+    P.label "lambda" (P.try ((Lambda .) . LambdaDef <$> lamArgs <* arrow <*> expr))
       P.<|> (P.try (anyOperator <* P.lookAhead (P.char ')')) <&> \op -> Hole `op` Hole)
       P.<|> ( (,)
                 <$> expr

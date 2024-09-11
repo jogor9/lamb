@@ -284,8 +284,50 @@ sections =
     ("(a + c -)", (Name "a" `Plus` Name "c") `Minus` Hole)
   ]
 
+parenLambdaTerms :: [(Text, Expr)]
+parenLambdaTerms =
+  [ ("(a -> b)", Lambda $ LambdaDef [(Just "a", Nothing)] (Name "b")),
+    ( "(_ b -> c)",
+      Lambda $
+        LambdaDef
+          [ (Nothing, Nothing),
+            (Just "b", Nothing)
+          ]
+          (Name "c")
+    ),
+    ( "(a : 42 b : int -> c)",
+      Lambda $
+        LambdaDef
+          [ (Just "a", Just $ Pattern Nothing (Numeral 42) Nothing),
+            (Just "b", Just $ Pattern Nothing (Name "int") Nothing)
+          ]
+          (Name "c")
+    )
+  ]
+
+lambdaTerms :: [(Text, Expr)]
+lambdaTerms =
+  [ ("\\a -> b", Lambda $ LambdaDef [(Just "a", Nothing)] (Name "b")),
+    ( "\\_ b -> c",
+      Lambda $
+        LambdaDef
+          [ (Nothing, Nothing),
+            (Just "b", Nothing)
+          ]
+          (Name "c")
+    ),
+    ( "\\a : 42 b : int -> c",
+      Lambda $
+        LambdaDef
+          [ (Just "a", Just $ Pattern Nothing (Numeral 42) Nothing),
+            (Just "b", Just $ Pattern Nothing (Name "int") Nothing)
+          ]
+          (Name "c")
+    )
+  ]
+
 parenTerms :: [Text]
-parenTerms = units ++ map fst (parenExprs ++ tuples ++ sections ++ preOps)
+parenTerms = units ++ map fst (parenExprs ++ tuples ++ sections ++ preOps ++ parenLambdaTerms)
 
 terms :: [Text]
 terms =
@@ -403,6 +445,8 @@ exprs =
     ++ fmap fst condExprs
     ++ fmap fst defs
     ++ fmap fst letExprs
+    ++ fmap fst caseExprs
+    ++ fmap fst lambdaTerms
 
 noEmpty :: Parser a -> SpecWith (Arg (IO ()))
 noEmpty parser =
@@ -521,6 +565,8 @@ main = hspec $ do
       parensTerm `parsing` preOps
     it "parses postfix sections" $ do
       parensTerm `parsing` sections
+    it "parses lambda expressions" $ do
+      parensTerm `parsing` parenLambdaTerms
   describe "Lamb.Parser.appTerm" $ do
     noEmpty appTerm
     it "rejects complex non-applicative expressions" $ do
@@ -599,6 +645,14 @@ main = hspec $ do
                            )
                            `Pipe` Application (Name "uncurry") [Equals Hole Hole]
                        )
+  describe "Lamb.Parser.lambdaTerm" $ do
+    noEmpty lambdaTerm
+    it "rejects non-lambdas" $ do
+      lambdaTerm `notParsing` exprs \\ map fst lambdaTerms
+    it "correctly parses lambdas" $ do
+      lambdaTerm `parsing` lambdaTerms
+
+-- TODO: guardTerm, do-while, while-do
 
 -- describe "Lamb.Parser.expr" $ do
 --   it "correctly parses various expressions" $ do
