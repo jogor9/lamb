@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -6,9 +7,11 @@
 module Main (main) where
 
 import Control.Exception
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Bifunctor
 import Data.Either
 import Data.Foldable
+import Data.Function
 import Data.List
 import Data.Scientific (Scientific)
 import Data.Text (Text)
@@ -16,8 +19,11 @@ import qualified Data.Text.IO as T
 import Lamb.AST
 import Lamb.Graphviz
 import Lamb.Parser
+import System.Directory
+import System.FilePath
 import Test.Hspec
 import qualified Text.Megaparsec as P
+import Text.Printf
 
 parse :: Parser a -> Text -> IO a
 parse parser source =
@@ -670,9 +676,22 @@ main = hspec $ do
     it "correctly parses guards" $ do
       guardTerm `parsing` guardTerms
   describe "Lamb.Parser.program" $ do
-    noEmpty program
-    it "parses program statements" $ do
-      (T.readFile "test.lamb" >>= parse program) `shouldNotReturn` []
+    it "accepts an empty string" $ do
+      parse program "" `shouldReturn` []
+    let correctDir = "data" </> "test" </> "correct"
+    runIO (listDirectory correctDir) >>= \files ->
+      files
+        & zip <*> map (++ ".spec")
+        & filter ((`elem` files) . snd)
+        & map (bimap (correctDir </>) (correctDir </>))
+        & \case
+          [] -> error "expected at least one test file"
+          xs -> xs
+        & traverse_
+          ( \(file, spec) -> it (printf "correctly parses '%s'" file) $ do
+              r <- read <$> readFile spec
+              (T.readFile file >>= parse program) `shouldReturn` r
+          )
 
 -- TODO: do-while, while-do
 

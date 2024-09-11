@@ -1,0 +1,10 @@
+c + case x ->
+        y -> z;
+        a -> b -> c;
+        d | e -> f;
+        g -> h | i -> j;
+2 + | guard -> 4
+    | otherwise -> 5;
+- 2 ^ 3 + let n = 45;
+              m = 69;
+              m * n
