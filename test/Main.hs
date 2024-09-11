@@ -495,8 +495,8 @@ main = hspec $ do
       compound `parsing` compoundExprs
   describe "Lamb.Parser.condTerm" $ do
     noEmpty condTerm
-    it "rejects non-conditional terms" $ do
-      condTerm `notParsing` terms \\ fmap fst condExprs
+    it "rejects non-conditionals" $ do
+      condTerm `notParsing` (exprs ++ terms) \\ fmap fst condExprs
     it "correctly parses conditionals" $
       condTerm `parsing` condExprs
   describe "Lamb.Parser.decl" $ do
