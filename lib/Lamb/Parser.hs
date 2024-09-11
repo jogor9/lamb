@@ -329,7 +329,7 @@ parensTerm =
                     )
                 >>= \(h, t) -> case t of
                   Left [] -> return h P.<?> "expression"
-                  Left l -> return (foldr Tuple h l) P.<?> "tuple"
+                  Left l -> return (foldr1 Tuple $ h :| l) P.<?> "tuple"
                   Right op -> return (h `op` Hole) P.<?> "section"
             )
       P.<|> (anyOperator <&> \op -> Hole `op` Hole)
