@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -45,10 +46,12 @@ import Data.Functor
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HSet
 import Data.List.NonEmpty (NonEmpty (..))
-import Data.Scientific (scientific)
+import Data.Ratio
+import Data.Scientific (fromRationalRepetendUnlimited, scientific)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Void
+import Debug.Trace
 import Lamb.AST
 import Numeric
 import Text.Megaparsec (Parsec)
@@ -150,10 +153,32 @@ rawStringLiteral =
               P.<|> P.tokens (/=) "\"\"\""
           )
 
-log2int :: (Bits a) => a -> Int
-log2int n
-  | n == zeroBits = -1
-  | otherwise = 1 + log2int (n `shiftR` 1)
+ilogBase :: (Integral a) => a -> a -> Int
+ilogBase b n
+  | n == 0 = -1
+  | otherwise = 1 + ilogBase b (n `div` b)
+
+unsafeReadHex :: (Eq a, Num a) => String -> a
+unsafeReadHex =
+  readHex
+    >>> filter (snd >>> null)
+    >>> map fst
+    >>> \case
+      [] -> error "expected hexadecimal parse"
+      x : _ -> x
+
+charToDigit :: Int -> Char
+charToDigit = chr . (ord '0' +)
+
+hexToDecStr :: String -> String
+hexToDecStr =
+  uncurry (\c -> if c /= 0 then (charToDigit c :) else id)
+    . foldr
+      ( \d (c, r) ->
+          let (nc, nd) = (c + digitToInt d) `divMod` 10
+           in (nc, charToDigit nd : r)
+      )
+      (0, "")
 
 numeral :: Parser Expr
 numeral =
@@ -161,24 +186,26 @@ numeral =
       *> P.choice
         [ P.char '.'
             >> ( \frac expo ->
-                   let (_, s) =
-                         (frac, 0)
-                           & until ((== 0) . fst) (bimap (`mod` 10) (+ 1))
-                    in scientific frac (expo - s)
+                   scientific (read frac) (expo - length frac)
                )
-              <$> L.decimal
+              . toList
+              <$> P.some P.digitChar
               <*> P.option 0 (P.char' 'e' *> L.signed (return ()) L.decimal),
           P.char' 'x'
-            >> ( \int frac expo ->
-                   let s = log2int frac + 1
-                    in scientific (int `shiftL` s .|. frac) (expo - s)
+            >> ( \case
+                   0 -> \_ _ -> 0
+                   int -> \frac expo ->
+                     fst . fromRationalRepetendUnlimited $
+                       (int `shiftL` (4 * length frac) .|. unsafeReadHex frac)
+                         `shiftL` abs expo
+                         % 1 `shiftL` (4 * length frac + max 0 (-expo))
                )
               <$> L.hexadecimal
-              <*> P.option 0 (P.char '.' *> L.hexadecimal)
+              <*> P.option "0" (P.char '.' *> P.some P.hexDigitChar <&> toList)
               <*> P.option 0 (P.char' 'p' *> L.signed (return ()) L.decimal),
           P.char' 'o' >> L.octal <&> fromInteger,
           P.char' 'b' >> L.binary <&> fromInteger,
-          return 0
+          P.option 0 L.scientific
         ]
   )
     P.<|> L.scientific
