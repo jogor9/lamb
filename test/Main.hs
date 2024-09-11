@@ -12,6 +12,7 @@ import Data.Foldable
 import Data.List
 import Data.Scientific (Scientific)
 import Data.Text (Text)
+import qualified Data.Text.IO as T
 import Lamb.AST
 import Lamb.Graphviz
 import Lamb.Parser
@@ -668,6 +669,10 @@ main = hspec $ do
       guardTerm `notParsing` exprs \\ map fst guardTerms
     it "correctly parses guards" $ do
       guardTerm `parsing` guardTerms
+  describe "Lamb.Parser.program" $ do
+    noEmpty program
+    it "parses program statements" $ do
+      (T.readFile "test.lamb" >>= parse program) `shouldNotReturn` []
 
 -- TODO: do-while, while-do
 

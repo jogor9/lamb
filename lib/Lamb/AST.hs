@@ -13,16 +13,16 @@ import Data.Scientific (Scientific)
 import Data.Text (Text)
 
 data Pattern = Pattern (Maybe Expr) Expr (Maybe Expr)
-  deriving (Show, Eq)
+  deriving (Read, Show, Eq)
 
 data Decl = Decl (Text, Maybe Pattern) [(Maybe Text, Maybe Pattern)]
-  deriving (Show, Eq)
+  deriving (Read, Show, Eq)
 
 data Def = Def Decl Expr
-  deriving (Show, Eq)
+  deriving (Read, Show, Eq)
 
 data LambdaDef = LambdaDef (NonEmpty (Maybe Text, Maybe Pattern)) Expr
-  deriving (Show, Eq)
+  deriving (Read, Show, Eq)
 
 data Expr
   = List [Expr]
@@ -102,10 +102,10 @@ data Expr
   | ModuloAssign Expr Expr
   | -- prec -1
     Lambda LambdaDef
-  deriving (Show, Eq)
+  deriving (Show, Eq, Read)
 
 data TopLevel
   = TopLevelDecl Decl
   | TopLevelDef Def
   | TopLevelExpr Expr
-  deriving (Show, Eq)
+  deriving (Read, Show, Eq)

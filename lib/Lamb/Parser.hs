@@ -424,8 +424,7 @@ caseTerm =
           P.<?> "case pattern"
    in Case
         <$> (symbol "case" *> expr <* arrow)
-        <*> P.try pat
-          `P.sepBy1` semi
+        <*> ((:|) <$> pat <*> P.many (P.try $ semi *> pat))
         P.<?> "case expression"
 
 letTerm :: Parser Expr
@@ -641,13 +640,13 @@ expr =
 program :: Parser [TopLevel]
 program =
   spaceConsumer
-    >> P.choice
+    *> P.choice
       [ colon *> decl <&> TopLevelDecl,
         P.try def <&> TopLevelDef,
         expr <&> TopLevelExpr
       ]
       `P.sepEndBy` semi
-      <* P.eof
+    <* P.eof
 
 parseLamb :: String -> Text -> Either String [TopLevel]
 parseLamb filename = P.parse program filename >>> first P.errorBundlePretty
