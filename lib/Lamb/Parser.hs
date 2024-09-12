@@ -326,17 +326,13 @@ parensTerm =
     P.label "lambda" (P.try ((Lambda .) . LambdaDef <$> lamArgs <* arrow <*> expr))
       P.<|> (P.try (anyOperator <* P.lookAhead (P.char ')')) <&> \op -> Hole `op` Hole)
       P.<|> ( (,)
-                <$> expr
-                <*> ( Right
-                        <$> anyOperator
-                        <* P.lookAhead (P.char ')')
-                          P.<|> (Left <$> (comma *> expr `P.sepBy` comma))
-                          P.<|> return (Left [])
+                <$> exprPostfixSections
+                <*> ( (comma *> exprPostfixSections `P.sepBy` comma)
+                        P.<|> return []
                     )
                 >>= \(h, t) -> case t of
-                  Left [] -> return h P.<?> "expression"
-                  Left l -> return (foldr1 Tuple $ h :| l) P.<?> "tuple"
-                  Right op -> return (h `op` Hole) P.<?> "section"
+                  [] -> return h P.<?> "expression"
+                  l -> return (foldr1 Tuple $ h :| l) P.<?> "tuple"
             )
       P.<|> P.label "unit" (return Unit)
 
@@ -389,11 +385,9 @@ primaryTerm =
       compound,
       rawStringLiteral,
       stringLiteral,
-      charLiteral
+      charLiteral,
+      parensTerm
     ]
-
-singleTerm :: Parser Expr
-singleTerm = primaryTerm P.<|> parensTerm
 
 appTerm :: Parser Expr
 appTerm =
@@ -401,8 +395,8 @@ appTerm =
       Just xs -> Application f xs
       Nothing -> f
   )
-    <$> singleTerm
-    <*> ( (Just <$> P.some singleTerm P.<?> "application")
+    <$> primaryTerm
+    <*> ( (Just <$> P.some primaryTerm P.<?> "application")
             P.<|> return Nothing
         )
 
@@ -411,8 +405,8 @@ caseTerm =
   let pat =
         ( \firstExpr (secondExpr, cond, e) ->
             case secondExpr of
-              Just p -> (Pattern (Just firstExpr) p cond, e)
-              Nothing -> (Pattern Nothing firstExpr cond, e)
+              Just p -> (Just firstExpr, p, cond, e)
+              Nothing -> (Nothing, firstExpr, cond, e)
         )
           <$> expr
           <*> ( ( \firstExpr cond -> \case
@@ -535,35 +529,40 @@ nonAssoc op cons = InfixN (cons <$ operator op)
 prefix :: Text -> (Expr -> Expr) -> Operator Parser Expr
 prefix op cons = Prefix (cons <$ operator op)
 
+postfix :: Text -> (Expr -> Expr) -> Operator Parser Expr
+postfix op cons = Postfix (cons <$ operator op)
+
 pattern :: Parser Pattern
 pattern =
-  ( \firstExpr -> \case
-      Just secondExpr -> Pattern (Just firstExpr) secondExpr
-      Nothing -> Pattern Nothing firstExpr
+  ( ( \firstExpr -> \case
+        Just secondExpr -> (Just firstExpr,secondExpr,)
+        Nothing -> (Nothing,firstExpr,)
+    )
+      <$> expr
+      <*> P.optional (arrow *> expr)
+      <*> P.optional (bar *> expr)
   )
-    <$> expr
-    <*> P.optional (arrow *> expr)
-    <*> P.optional (bar *> expr)
+    `P.sepBy1` comma
+    <&> toList
     P.<?> "pattern match"
 
-declItem :: Parser a -> Parser (a, Maybe Pattern)
+declItem :: Parser a -> Parser (a, Pattern)
 declItem nm =
   (,)
     <$> nm
-    <*> P.optional
+    <*> P.option
+      []
       ( colon
-          *> ( parens pattern
-                 P.<|> ((\t -> Pattern Nothing t Nothing) <$> primaryTerm)
+          *> ( P.try (parens pattern)
+                 P.<|> ((\t -> [(Nothing, t, Nothing)]) <$> primaryTerm)
              )
       )
     P.<?> "name declaration"
 
-argDecl :: Parser (Maybe Text, Maybe Pattern)
-argDecl =
-  P.label "argument declaration" . declItem $
-    Just <$> nameText P.<|> Nothing <$ hole
+argDecl :: Parser (Expr, Pattern)
+argDecl = declItem primaryTerm
 
-lamArgs :: Parser (NonEmpty (Maybe Text, Maybe Pattern))
+lamArgs :: Parser (NonEmpty (Expr, Pattern))
 lamArgs = P.some argDecl
 
 decl :: Parser Decl
@@ -583,6 +582,9 @@ def =
 
 prefixSection :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
 prefixSection op cons = prefix op (Hole `cons`)
+
+postfixSection :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
+postfixSection op cons = postfix op (`cons` Hole)
 
 operatorTable :: [[Operator Parser Expr]]
 operatorTable =
@@ -651,6 +653,31 @@ operatorTable =
       rightOp "%=" ModuloAssign
     ]
   ]
+
+exprPostfixSections :: Parser Expr
+exprPostfixSections =
+  makeExprParser
+    term
+    $ operatorTable
+      ++ [ [ postfixSection "." NameAccess,
+             postfixSection "@" IndexAccess,
+             postfixSection "^" Power,
+             postfixSection "*" Times,
+             postfixSection "/" Divide,
+             postfixSection "%" Modulo,
+             postfixSection "+" Plus,
+             postfixSection "++" Concatenation,
+             postfixSection "==" Equals,
+             postfixSection "!=" NotEquals,
+             postfixSection "<" Lt,
+             postfixSection ">" Gt,
+             postfixSection "<=" Le,
+             postfixSection ">=" Ge,
+             postfixSection "?" MemberOf,
+             postfixSection "&&" Conjunction,
+             postfixSection "||" Alternation
+           ]
+         ]
 
 exprNoDoWhile :: Parser Expr
 exprNoDoWhile = makeExprParser termNoDoWhile operatorTable

@@ -293,20 +293,20 @@ sections =
 
 parenLambdaTerms :: [(Text, Expr)]
 parenLambdaTerms =
-  [ ("(a -> b)", Lambda $ LambdaDef [(Just "a", Nothing)] (Name "b")),
+  [ ("(a -> b)", Lambda $ LambdaDef [(Name "a", [])] (Name "b")),
     ( "(_ b -> c)",
       Lambda $
         LambdaDef
-          [ (Nothing, Nothing),
-            (Just "b", Nothing)
+          [ (Hole, []),
+            (Name "b", [])
           ]
           (Name "c")
     ),
     ( "(a : 42 b : int -> c)",
       Lambda $
         LambdaDef
-          [ (Just "a", Just $ Pattern Nothing (Numeral 42) Nothing),
-            (Just "b", Just $ Pattern Nothing (Name "int") Nothing)
+          [ (Name "a", [(Nothing, Numeral 42, Nothing)]),
+            (Name "b", [(Nothing, Name "int", Nothing)])
           ]
           (Name "c")
     )
@@ -314,20 +314,20 @@ parenLambdaTerms =
 
 lambdaTerms :: [(Text, Expr)]
 lambdaTerms =
-  [ ("\\a -> b", Lambda $ LambdaDef [(Just "a", Nothing)] (Name "b")),
+  [ ("\\a -> b", Lambda $ LambdaDef [(Name "a", [])] (Name "b")),
     ( "\\_ b -> c",
       Lambda $
         LambdaDef
-          [ (Nothing, Nothing),
-            (Just "b", Nothing)
+          [ (Hole, []),
+            (Name "b", [])
           ]
           (Name "c")
     ),
     ( "\\a : 42 b : int -> c",
       Lambda $
         LambdaDef
-          [ (Just "a", Just $ Pattern Nothing (Numeral 42) Nothing),
-            (Just "b", Just $ Pattern Nothing (Name "int") Nothing)
+          [ (Name "a", [(Nothing, Numeral 42, Nothing)]),
+            (Name "b", [(Nothing, Name "int", Nothing)])
           ]
           (Name "c")
     )
@@ -385,13 +385,13 @@ doWhileExprs =
 
 decls :: [(Text, Decl)]
 decls =
-  [ ("a", Decl ("a", Nothing) []),
-    ("a : pat", Decl ("a", Just (Pattern Nothing (Name "pat") Nothing)) []),
-    ("a b", Decl ("a", Nothing) [(Just "b", Nothing)]),
+  [ ("a", Decl ("a", []) []),
+    ("a : pat", Decl ("a", [(Nothing, Name "pat", Nothing)]) []),
+    ("a b", Decl ("a", []) [(Name "b", [])]),
     ( "a : pat b : pat",
       Decl
-        ("a", Just $ Pattern Nothing (Name "pat") Nothing)
-        [(Just "b", Just $ Pattern Nothing (Name "pat") Nothing)]
+        ("a", [(Nothing, Name "pat", Nothing)])
+        [(Name "b", [(Nothing, Name "pat", Nothing)])]
     )
   ]
 
@@ -417,29 +417,29 @@ caseExprs =
   [ ( "case a -> b -> c; _ -> d",
       Case
         (Name "a")
-        [ (Pattern Nothing (Name "b") Nothing, Name "c"),
-          (Pattern Nothing Hole Nothing, Name "d")
+        [ (Nothing, Name "b", Nothing, Name "c"),
+          (Nothing, Hole, Nothing, Name "d")
         ]
     ),
     ( "case a -> b | c -> d; e -> f",
       Case
         (Name "a")
-        [ (Pattern Nothing (Name "b") $ Just (Name "c"), Name "d"),
-          (Pattern Nothing (Name "e") Nothing, Name "f")
+        [ (Nothing, Name "b", Just (Name "c"), Name "d"),
+          (Nothing, Name "e", Nothing, Name "f")
         ]
     ),
     ( "case a -> b -> c -> d; e -> f",
       Case
         (Name "a")
-        [ (Pattern (Just (Name "b")) (Name "c") Nothing, Name "d"),
-          (Pattern Nothing (Name "e") Nothing, Name "f")
+        [ (Just (Name "b"), Name "c", Nothing, Name "d"),
+          (Nothing, Name "e", Nothing, Name "f")
         ]
     ),
     ( "case a -> b -> c | g -> d; e -> f",
       Case
         (Name "a")
-        [ (Pattern (Just (Name "b")) (Name "c") (Just (Name "g")), Name "d"),
-          (Pattern Nothing (Name "e") Nothing, Name "f")
+        [ (Just (Name "b"), Name "c", Just (Name "g"), Name "d"),
+          (Nothing, Name "e", Nothing, Name "f")
         ]
     )
   ]

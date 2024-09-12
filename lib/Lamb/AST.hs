@@ -1,5 +1,5 @@
 module Lamb.AST
-  ( Pattern (..),
+  ( Pattern,
     Decl (..),
     Def (..),
     LambdaDef (..),
@@ -12,16 +12,15 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Scientific (Scientific)
 import Data.Text (Text)
 
-data Pattern = Pattern (Maybe Expr) Expr (Maybe Expr)
-  deriving (Read, Show, Eq)
+type Pattern = [(Maybe Expr, Expr, Maybe Expr)]
 
-data Decl = Decl (Text, Maybe Pattern) [(Maybe Text, Maybe Pattern)]
+data Decl = Decl (Text, Pattern) [(Expr, Pattern)]
   deriving (Read, Show, Eq)
 
 data Def = Def Decl Expr
   deriving (Read, Show, Eq)
 
-data LambdaDef = LambdaDef (NonEmpty (Maybe Text, Maybe Pattern)) Expr
+data LambdaDef = LambdaDef (NonEmpty (Expr, Pattern)) Expr
   deriving (Read, Show, Eq)
 
 data Expr
@@ -82,7 +81,7 @@ data Expr
   | WhileDo Expr Expr
   | Guard (NonEmpty (Expr, Expr)) Expr
   | IfDo Expr Expr
-  | Case Expr (NonEmpty (Pattern, Expr))
+  | Case Expr (NonEmpty (Maybe Expr, Expr, Maybe Expr, Expr))
   | -- prec 3
     Pipe Expr Expr
   | Bind Expr Expr

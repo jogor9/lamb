@@ -14,7 +14,6 @@ import qualified Data.ByteString.Builder as BSB
 import Data.Foldable
 import Data.Functor
 import qualified Data.List.NonEmpty as NE
-import Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import Lamb.AST
 
@@ -58,26 +57,26 @@ node label attribs =
     attribs' = ("label", label) : attribs
 
 patternToGraphviz :: Pattern -> GraphvizStep
-patternToGraphviz (Pattern trans pat cond) =
-  node "~" [] $
-    toList ((,[("label", "transform")]) . exprToGraphviz <$> trans)
-      <> [(exprToGraphviz pat, [("label", "pattern")])]
-      <> toList ((,[("label", "condition")]) . exprToGraphviz <$> cond)
+patternToGraphviz =
+  plainNode "~" []
+    . fmap
+      ( \(trans, pat, cond) ->
+          node "," [] $
+            toList ((,[("label", "transform")]) . exprToGraphviz <$> trans)
+              <> [(exprToGraphviz pat, [("label", "pattern")])]
+              <> toList ((,[("label", "condition")]) . exprToGraphviz <$> cond)
+      )
 
-argDeclToGraphviz :: (Maybe Text, Maybe Pattern) -> GraphvizStep
+argDeclToGraphviz :: (Expr, Pattern) -> GraphvizStep
 argDeclToGraphviz (arg, pat) =
-  plainNode "(x)" [] $
-    [ case arg of
-        Nothing -> exprToGraphviz Hole
-        Just nm -> exprToGraphviz $ Name nm
-    ]
-      <> toList (patternToGraphviz <$> pat)
+  plainNode "(x)" [] [exprToGraphviz arg, patternToGraphviz pat]
 
 declToGraphviz :: Decl -> GraphvizStep
 declToGraphviz (Decl (nm, pat) args) =
   plainNode "f : x" [] $
-    [exprToGraphviz $ Name nm]
-      <> toList (patternToGraphviz <$> pat)
+    [ exprToGraphviz $ Name nm,
+      patternToGraphviz pat
+    ]
       <> map argDeclToGraphviz args
 
 defToGraphviz :: Def -> GraphvizStep
@@ -180,11 +179,11 @@ exprToGraphviz = \case
     plainNode "case" [] $
       pure (exprToGraphviz obj)
         <> fmap
-          ( \(pat, e) ->
+          ( \(trans, pat, cond, e) ->
               plainNode
                 "->|->"
                 []
-                [patternToGraphviz pat, exprToGraphviz e]
+                [patternToGraphviz $ pure (trans, pat, cond), exprToGraphviz e]
           )
           pats
   Lambda (LambdaDef args e) ->
