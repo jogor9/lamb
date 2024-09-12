@@ -49,11 +49,10 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HSet
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Ratio
-import Data.Scientific (fromRationalRepetendUnlimited, scientific)
+import Data.Scientific (scientific)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Void
-import Debug.Trace
 import Lamb.AST
 import Numeric
 import Text.Megaparsec (Parsec)
@@ -155,11 +154,6 @@ rawStringLiteral =
               P.<|> P.tokens (/=) "\"\"\""
           )
 
-ilogBase :: (Integral a) => a -> a -> Int
-ilogBase b n
-  | n == 0 = -1
-  | otherwise = 1 + ilogBase b (n `div` b)
-
 unsafeReadHex :: (Eq a, Num a) => String -> a
 unsafeReadHex =
   readHex
@@ -168,19 +162,6 @@ unsafeReadHex =
     >>> \case
       [] -> error "expected hexadecimal parse"
       x : _ -> x
-
-charToDigit :: Int -> Char
-charToDigit = chr . (ord '0' +)
-
-hexToDecStr :: String -> String
-hexToDecStr =
-  uncurry (\c -> if c /= 0 then (charToDigit c :) else id)
-    . foldr
-      ( \d (c, r) ->
-          let (nc, nd) = (c + digitToInt d) `divMod` 10
-           in (nc, charToDigit nd : r)
-      )
-      (0, "")
 
 numeral :: Parser Expr
 numeral =
@@ -215,7 +196,7 @@ numeral =
     & lexeme
     P.<?> "number"
 
-semi, comma, arrow, bar, doubleDot, colon, equals, act, while :: Parser ()
+semi, comma, arrow, bar, doubleDot, colon, equals, act, while, given :: Parser ()
 semi = void $ symbol ";"
 comma = void $ symbol ","
 arrow = void $ operator "->"
@@ -225,7 +206,6 @@ colon = void $ operator ":"
 equals = void $ operator "="
 act = void $ symbol "do"
 while = void $ symbol "while"
-
 given = void $ symbol "if"
 
 -- (a b c -> a * b + c)
