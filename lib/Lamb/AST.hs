@@ -81,7 +81,7 @@ data Expr
   | DoWhile (NonEmpty Expr) Expr
   | WhileDo Expr Expr
   | Guard (NonEmpty (Expr, Expr)) Expr
-  | SingleGuard Expr Expr
+  | IfDo Expr Expr
   | Case Expr (NonEmpty (Pattern, Expr))
   | -- prec 3
     Pipe Expr Expr

@@ -25,6 +25,8 @@ module Lamb.Parser
     decl,
     lambdaTerm,
     guardTerm,
+    whileDo,
+    doWhile,
     argDecl,
     name,
     hole,
@@ -223,6 +225,8 @@ colon = void $ operator ":"
 equals = void $ operator "="
 act = void $ symbol "do"
 while = void $ symbol "while"
+
+given = void $ symbol "if"
 
 -- (a b c -> a * b + c)
 
@@ -448,8 +452,6 @@ guardTerm =
       <* arrow
       <*> expr
 
--- P.<|> (SingleGuard <$> expr <* arrow <*> expr)
-
 lambdaTerm :: Parser Expr
 lambdaTerm =
   (Lambda .)
@@ -459,14 +461,46 @@ lambdaTerm =
 
 condTerm :: Parser Expr
 condTerm =
-  IfThenElse
-    <$> (symbol "if" *> expr)
-    <*> (symbol "then" *> expr)
-    <*> (symbol "else" *> expr)
+  ( \c (t, mf) ->
+      case mf of
+        Just f -> IfThenElse c t f
+        Nothing -> IfDo c t
+  )
+    <$> (given *> exprNoDoWhile)
+    <*> ( (,)
+            <$> (symbol "then" *> expr)
+            <*> (symbol "else" *> expr <&> Just)
+              P.<|> (act *> expr <&> (,Nothing))
+        )
     P.<?> "conditional expression"
 
-term :: Parser Expr
-term =
+-- needs to parse the expression after 'while' to determine
+-- validity
+-- do
+--    ...;
+--    while ... do
+--        ...;
+--    while ... do
+--        ...;
+-- while ...;
+doWhile :: Parser Expr
+doWhile =
+  DoWhile <$> (act *> exprTryWhile `P.sepEndBy1` semi) <* while <*> expr
+    P.<?> "do-while expression"
+
+termNoWhile :: Parser Expr
+termNoWhile = termNoLoop P.<|> doWhile P.<?> "terminal expression"
+
+termTryWhile :: Parser Expr
+termTryWhile = termNoWhile P.<|> P.try whileDo P.<?> "terminal expression"
+
+whileDo :: Parser Expr
+whileDo =
+  WhileDo <$> (while *> exprNoDoWhile) <* act <*> expr
+    P.<?> "while-do expression"
+
+termNoLoop :: Parser Expr
+termNoLoop =
   P.choice
     [ condTerm,
       caseTerm,
@@ -477,6 +511,12 @@ term =
       appTerm
     ]
     P.<?> "terminal expression"
+
+termNoDoWhile :: Parser Expr
+termNoDoWhile = termNoLoop P.<|> whileDo P.<?> "terminal expression"
+
+term :: Parser Expr
+term = termNoDoWhile P.<|> doWhile P.<?> "terminal expression"
 
 compound :: Parser Expr
 compound =
@@ -545,97 +585,85 @@ def =
 prefixSection :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
 prefixSection op cons = prefix op (Hole `cons`)
 
+operatorTable :: [[Operator Parser Expr]]
+operatorTable =
+  [ [ leftOp "." NameAccess,
+      leftOp "@" IndexAccess
+    ],
+    [rightOp "^" Power],
+    [prefix "-" UMinus],
+    [ leftOp "*" Times,
+      leftOp "/" Divide,
+      leftOp "%" Modulo
+    ],
+    [ leftOp "+" Plus,
+      leftOp "-" Minus
+    ],
+    [leftOp "++" Concatenation],
+    [ leftOp "==" Equals,
+      leftOp "!=" NotEquals,
+      leftOp "<" Lt,
+      leftOp ">" Gt,
+      leftOp "<=" Le,
+      leftOp ">=" Ge
+    ],
+    [nonAssoc "?" MemberOf],
+    [leftOp "&&" Conjunction],
+    [leftOp "||" Alternation],
+    [ prefixSection "." NameAccess,
+      prefixSection "@" IndexAccess,
+      prefixSection "^" Power,
+      prefixSection "*" Times,
+      prefixSection "/" Divide,
+      prefixSection "%" Modulo,
+      prefixSection "+" Plus,
+      prefixSection "++" Concatenation,
+      prefixSection "==" Equals,
+      prefixSection "!=" NotEquals,
+      prefixSection "<" Lt,
+      prefixSection ">" Gt,
+      prefixSection "<=" Le,
+      prefixSection ">=" Ge,
+      prefixSection "?" MemberOf,
+      prefixSection "&&" Conjunction,
+      prefixSection "||" Alternation
+    ],
+    [ leftOp "&>" Compose,
+      leftOp "^>" MonadicCompose
+    ],
+    [ rightOp "<&" RevCompose,
+      rightOp "<^" RevMonadicCompose
+    ],
+    [leftOp "<&>" Parallel],
+    [ leftOp "|>" Pipe,
+      leftOp "?>" Bind,
+      leftOp "@>" Over
+    ],
+    [ rightOp "<|" RevPipe,
+      rightOp "<?" RevBind,
+      rightOp "<@" RevOver
+    ],
+    [leftOp "<|>" Alternation],
+    [ rightOp ":=" Assign,
+      rightOp "+=" PlusAssign,
+      rightOp "-=" MinusAssign,
+      rightOp "*=" TimesAssign,
+      rightOp "/=" DivideAssign,
+      rightOp "%=" ModuloAssign
+    ]
+  ]
+
+exprNoDoWhile :: Parser Expr
+exprNoDoWhile = makeExprParser termNoDoWhile operatorTable
+
+exprTryWhile :: Parser Expr
+exprTryWhile = makeExprParser termTryWhile operatorTable
+
 expr :: Parser Expr
 expr =
   makeExprParser
     term
-    [ [ leftOp "." NameAccess,
-        leftOp "@" IndexAccess
-      ],
-      [rightOp "^" Power],
-      [prefix "-" UMinus],
-      [ leftOp "*" Times,
-        leftOp "/" Divide,
-        leftOp "%" Modulo
-      ],
-      [ leftOp "+" Plus,
-        leftOp "-" Minus
-      ],
-      [leftOp "++" Concatenation],
-      [ leftOp "==" Equals,
-        leftOp "!=" NotEquals,
-        leftOp "<" Lt,
-        leftOp ">" Gt,
-        leftOp "<=" Le,
-        leftOp ">=" Ge
-      ],
-      [nonAssoc "?" MemberOf],
-      [leftOp "&&" Conjunction],
-      [leftOp "||" Alternation],
-      [ prefixSection "." NameAccess,
-        prefixSection "@" IndexAccess,
-        prefixSection "^" Power,
-        prefixSection "*" Times,
-        prefixSection "/" Divide,
-        prefixSection "%" Modulo,
-        prefixSection "+" Plus,
-        prefixSection "++" Concatenation,
-        prefixSection "==" Equals,
-        prefixSection "!=" NotEquals,
-        prefixSection "<" Lt,
-        prefixSection ">" Gt,
-        prefixSection "<=" Le,
-        prefixSection ">=" Ge,
-        prefixSection "?" MemberOf,
-        prefixSection "&&" Conjunction,
-        prefixSection "||" Alternation
-      ],
-      [ leftOp "&>" Compose,
-        leftOp "^>" MonadicCompose
-      ],
-      [ rightOp "<&" RevCompose,
-        rightOp "<^" RevMonadicCompose
-      ],
-      [leftOp "<&>" Parallel],
-      [ leftOp "|>" Pipe,
-        leftOp "?>" Bind,
-        leftOp "@>" Over
-      ],
-      [ rightOp "<|" RevPipe,
-        rightOp "<?" RevBind,
-        rightOp "<@" RevOver
-      ],
-      [leftOp "<|>" Alternation],
-      [ rightOp ":=" Assign,
-        rightOp "+=" PlusAssign,
-        rightOp "-=" MinusAssign,
-        rightOp "*=" TimesAssign,
-        rightOp "/=" DivideAssign,
-        rightOp "%=" ModuloAssign
-      ],
-      map
-        Prefix
-        [ P.try $
-            DoWhile
-              <$> ( act
-                      *> ( (:|)
-                             <$> expr
-                             <*> P.option [] (expr `P.sepEndBy` semi)
-                         )
-                  )
-              <* while,
-          -- needs to parse the expression after 'while' to determine
-          -- validity
-          -- do
-          --    ...;
-          --    while ... do
-          --        ...;
-          --    while ... do
-          --        ...;
-          -- while ...;
-          P.try $ WhileDo <$> (while *> expr) <* act
-        ]
-    ]
+    operatorTable
 
 program :: Parser [TopLevel]
 program =

@@ -175,7 +175,7 @@ exprToGraphviz = \case
         (\(cond, e) -> plainNode "|->" [] $ fmap exprToGraphviz [cond, e])
         conds
         <> pure (plainNode "otherwise" [] [exprToGraphviz lastExpr])
-  SingleGuard cond e -> plainNode "|->" [] $ fmap exprToGraphviz [cond, e]
+  IfDo cond e -> plainNode "|->" [] $ fmap exprToGraphviz [cond, e]
   Case obj pats ->
     plainNode "case" [] $
       pure (exprToGraphviz obj)

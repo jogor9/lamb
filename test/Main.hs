@@ -367,7 +367,21 @@ compoundExprs =
 
 condExprs :: [(Text, Expr)]
 condExprs =
-  [("if a then b else c", IfThenElse (Name "a") (Name "b") (Name "c"))]
+  [ ("if a then b else c", IfThenElse (Name "a") (Name "b") (Name "c")),
+    ("if a do b", IfDo (Name "a") (Name "b"))
+  ]
+
+whileDoExprs :: [(Text, Expr)]
+whileDoExprs =
+  [ ("while a do b", WhileDo (Name "a") (Name "b")),
+    ("while a do { a; b; }", WhileDo (Name "a") (Compound [Name "a", Name "b"]))
+  ]
+
+doWhileExprs :: [(Text, Expr)]
+doWhileExprs =
+  [ ("do a; while b", DoWhile [Name "a"] (Name "b")),
+    ("do a; while b do c; while d", DoWhile [Name "a", WhileDo (Name "b") (Name "c")] (Name "d"))
+  ]
 
 decls :: [(Text, Decl)]
 decls =
@@ -465,6 +479,8 @@ exprs =
     ++ fmap fst caseExprs
     ++ fmap fst lambdaTerms
     ++ fmap fst guardTerms
+    ++ fmap fst whileDoExprs
+    ++ fmap fst doWhileExprs
 
 noEmpty :: Parser a -> SpecWith (Arg (IO ()))
 noEmpty parser =
@@ -603,6 +619,18 @@ main = hspec $ do
       condTerm `notParsing` (exprs ++ terms) \\ fmap fst condExprs
     it "correctly parses conditionals" $
       condTerm `parsing` condExprs
+  describe "Lamb.Parser.whileDo" $ do
+    noEmpty whileDo
+    it "rejects non-while-dos" $ do
+      whileDo `notParsing` (exprs ++ terms) \\ fmap fst whileDoExprs
+    it "correctly parses while-do loops" $ do
+      whileDo `parsing` whileDoExprs
+  describe "Lamb.Parser.doWhile" $ do
+    noEmpty doWhile
+    it "rejects non-do-whiles" $ do
+      doWhile `notParsing` (exprs ++ terms) \\ fmap fst doWhileExprs
+    it "correctly parses do-while loops" $ do
+      doWhile `parsing` doWhileExprs
   describe "Lamb.Parser.decl" $ do
     noEmpty decl
     it "correctly parses declarations" $ do
@@ -692,8 +720,6 @@ main = hspec $ do
               r <- read <$> readFile spec
               (T.readFile file >>= parse program) `shouldReturn` r
           )
-
--- TODO: do-while, while-do
 
 -- describe "Lamb.Parser.expr" $ do
 --   it "correctly parses various expressions" $ do
