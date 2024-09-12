@@ -1,0 +1,7 @@
+quickSort : ([any] -> [any] | Compare any) =
+    .uncons &> case _ ->
+                   [] -> [];
+                   [head, tail] -> tail
+                                |> partition (< head)
+                                |> \(a, b) -> quickSort a ++ [head] ++ quickSort b;
+print <| quickSort [3, 4, 9, 3, 10, 15, 16, 2, 1]
