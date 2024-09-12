@@ -74,7 +74,7 @@ lexeme :: Parser a -> Parser a
 lexeme = L.lexeme spaceConsumer
 
 symbol :: Text -> Parser Text
-symbol = P.try . L.symbol spaceConsumer
+symbol = L.symbol spaceConsumer
 
 operatorChars :: HashSet Char
 operatorChars = HSet.fromList "!@%^&*-:<>.?/|+="
@@ -222,13 +222,32 @@ braces = P.between (symbol "{") (symbol "}")
 list :: Parser Expr
 list =
   P.label "list" . brackets $
-    P.try
-      ( RangeList
+    P.choice
+      [ (&)
           <$> expr
-          <*> P.optional (comma *> expr)
-          <*> (doubleDot *> P.optional expr)
-      )
-      P.<|> (List <$> expr `P.sepEndBy` comma)
+          <*> P.choice
+            [ doubleDot *> P.optional expr
+                <&> \rEnd rbegin -> RangeList rbegin Nothing rEnd,
+              comma
+                *> P.choice
+                  [ ( \step -> \case
+                        Left rEnd ->
+                          \rbegin -> RangeList rbegin (Just step) rEnd
+                        Right l ->
+                          \rbegin -> List $ rbegin : step : l
+                    )
+                      <$> expr
+                      <*> P.choice
+                        [ doubleDot *> P.optional expr <&> Left,
+                          (comma *> expr `P.sepEndBy` comma <&> Right)
+                            P.<|> return (Right [])
+                        ],
+                    return $ \rbegin -> List [rbegin]
+                  ],
+              return $ \rbegin -> List [rbegin]
+            ],
+        return $ List []
+      ]
 
 dict :: Parser Expr
 dict =
@@ -649,8 +668,7 @@ program :: Parser [TopLevel]
 program =
   spaceConsumer
     *> P.choice
-      [ colon *> decl <&> TopLevelDecl,
-        P.try def <&> TopLevelDef,
+      [ P.try def <&> TopLevelDef,
         expr <&> TopLevelExpr
       ]
       `P.sepEndBy` semi

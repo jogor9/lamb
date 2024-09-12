@@ -674,8 +674,8 @@ main = hspec $ do
       parse expr "x |> + 42" `shouldReturn` Pipe (Name "x") (Plus Hole (Numeral 42))
       parse expr "a ? b ?> ? c ?> ? d" `shouldReturn` Bind (Bind (MemberOf (Name "a") (Name "b")) (MemberOf Hole (Name "c"))) (MemberOf Hole (Name "d"))
     it "correctly parses complex pipelines" $ do
-      -- data |>    (sort &> group &> map length &> sum
-      --         <&> find "val" &> || 42               ) |> uncurry (==)
+      -- data |> (    sort &> group &> map length &> sum
+      --          <&> find "val" &> || 42               ) |> uncurry (==)
       parse expr "data |> (sort &> group &> map length &> sum <&> find \"val\" &> || 42) |> uncurry (==)"
         `shouldReturn` ( Pipe
                            (Name "data")
