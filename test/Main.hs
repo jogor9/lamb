@@ -293,43 +293,39 @@ sections =
 
 parenLambdaTerms :: [(Text, Expr)]
 parenLambdaTerms =
-  [ ("(a -> b)", Lambda $ LambdaDef [(Name "a", [])] (Name "b")),
+  [ ("(a -> b)", Lambda [([(Nothing, Name "a", Nothing)], [])] (Name "b")),
     ( "(_ b -> c)",
-      Lambda $
-        LambdaDef
-          [ (Hole, []),
-            (Name "b", [])
-          ]
-          (Name "c")
+      Lambda
+        [ ([(Nothing, Hole, Nothing)], []),
+          ([(Nothing, Name "b", Nothing)], [])
+        ]
+        (Name "c")
     ),
     ( "(a : 42 b : int -> c)",
-      Lambda $
-        LambdaDef
-          [ (Name "a", [(Nothing, Numeral 42, Nothing)]),
-            (Name "b", [(Nothing, Name "int", Nothing)])
-          ]
-          (Name "c")
+      Lambda
+        [ ([(Nothing, Name "a", Nothing)], [(Nothing, Numeral 42, Nothing)]),
+          ([(Nothing, Name "b", Nothing)], [(Nothing, Name "int", Nothing)])
+        ]
+        (Name "c")
     )
   ]
 
 lambdaTerms :: [(Text, Expr)]
 lambdaTerms =
-  [ ("\\a -> b", Lambda $ LambdaDef [(Name "a", [])] (Name "b")),
+  [ ("\\a -> b", Lambda [([(Nothing, Name "a", Nothing)], [])] (Name "b")),
     ( "\\_ b -> c",
-      Lambda $
-        LambdaDef
-          [ (Hole, []),
-            (Name "b", [])
-          ]
-          (Name "c")
+      Lambda
+        [ ([(Nothing, Hole, Nothing)], []),
+          ([(Nothing, Name "b", Nothing)], [])
+        ]
+        (Name "c")
     ),
     ( "\\a : 42 b : int -> c",
-      Lambda $
-        LambdaDef
-          [ (Name "a", [(Nothing, Numeral 42, Nothing)]),
-            (Name "b", [(Nothing, Name "int", Nothing)])
-          ]
-          (Name "c")
+      Lambda
+        [ ([(Nothing, Name "a", Nothing)], [(Nothing, Numeral 42, Nothing)]),
+          ([(Nothing, Name "b", Nothing)], [(Nothing, Name "int", Nothing)])
+        ]
+        (Name "c")
     )
   ]
 
@@ -387,11 +383,11 @@ decls :: [(Text, Decl)]
 decls =
   [ ("a", Decl ("a", []) []),
     ("a : pat", Decl ("a", [(Nothing, Name "pat", Nothing)]) []),
-    ("a b", Decl ("a", []) [(Name "b", [])]),
+    ("a b", Decl ("a", []) [([(Nothing, Name "b", Nothing)], [])]),
     ( "a : pat b : pat",
       Decl
         ("a", [(Nothing, Name "pat", Nothing)])
-        [(Name "b", [(Nothing, Name "pat", Nothing)])]
+        [([(Nothing, Name "b", Nothing)], [(Nothing, Name "pat", Nothing)])]
     )
   ]
 

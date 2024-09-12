@@ -67,9 +67,9 @@ patternToGraphviz =
               <> toList ((,[("label", "condition")]) . exprToGraphviz <$> cond)
       )
 
-argDeclToGraphviz :: (Expr, Pattern) -> GraphvizStep
-argDeclToGraphviz (arg, pat) =
-  plainNode "(x)" [] [exprToGraphviz arg, patternToGraphviz pat]
+argDeclToGraphviz :: (Pattern, Pattern) -> GraphvizStep
+argDeclToGraphviz (valPat, typePat) =
+  plainNode "(x)" [] [patternToGraphviz valPat, patternToGraphviz typePat]
 
 declToGraphviz :: Decl -> GraphvizStep
 declToGraphviz (Decl (nm, pat) args) =
@@ -186,7 +186,7 @@ exprToGraphviz = \case
                 [patternToGraphviz $ pure (trans, pat, cond), exprToGraphviz e]
           )
           pats
-  Lambda (LambdaDef args e) ->
+  Lambda args e ->
     plainNode "\\\\" [] $
       fmap argDeclToGraphviz args <> pure (exprToGraphviz e)
 

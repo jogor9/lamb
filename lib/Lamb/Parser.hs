@@ -199,7 +199,7 @@ numeral =
 semi, comma, arrow, bar, doubleDot, colon, equals, act, while, given :: Parser ()
 semi = void $ symbol ";"
 comma = void $ symbol ","
-arrow = void $ operator "->"
+arrow = void $ P.label "arrow" $ operator "->"
 bar = void $ operator "|"
 doubleDot = void $ operator ".."
 colon = void $ operator ":"
@@ -323,7 +323,7 @@ anyOperator =
 parensTerm :: Parser Expr
 parensTerm =
   parens $
-    P.label "lambda" (P.try ((Lambda .) . LambdaDef <$> lamArgs <* arrow <*> expr))
+    P.label "lambda" (P.try (Lambda <$> lamArgs <* arrow <*> expr))
       P.<|> (P.try (anyOperator <* P.lookAhead (P.char ')')) <&> \op -> Hole `op` Hole)
       P.<|> ( (,)
                 <$> exprPostfixSections
@@ -447,8 +447,8 @@ guardTerm =
 
 lambdaTerm :: Parser Expr
 lambdaTerm =
-  (Lambda .)
-    <$> (symbol "\\" *> (LambdaDef <$> lamArgs <* arrow))
+  Lambda
+    <$> (symbol "\\" *> lamArgs <* arrow)
     <*> expr
     P.<?> "lambda expression"
 
@@ -546,29 +546,25 @@ pattern =
     <&> toList
     P.<?> "pattern match"
 
-declItem :: Parser a -> Parser (a, Pattern)
-declItem nm =
-  (,)
-    <$> nm
-    <*> P.option
-      []
-      ( colon
-          *> ( P.try (parens pattern)
-                 P.<|> ((\t -> [(Nothing, t, Nothing)]) <$> primaryTerm)
-             )
-      )
-    P.<?> "name declaration"
+typeSpec :: Parser Pattern
+typeSpec = colon *> patternTerm P.<?> "type pattern"
 
-argDecl :: Parser (Expr, Pattern)
-argDecl = declItem primaryTerm
+patternTerm :: Parser Pattern
+patternTerm =
+  parens pattern
+    P.<|> ((\t -> [(Nothing, t, Nothing)]) <$> primaryTerm)
+    P.<?> "pattern"
 
-lamArgs :: Parser (NonEmpty (Expr, Pattern))
+argDecl :: Parser (Pattern, Pattern)
+argDecl = (,) <$> patternTerm <*> P.option [] typeSpec
+
+lamArgs :: Parser (NonEmpty (Pattern, Pattern))
 lamArgs = P.some argDecl
 
 decl :: Parser Decl
 decl =
   Decl
-    <$> declItem nameText
+    <$> ((,) <$> nameText <*> P.option [] typeSpec)
     <*> P.many argDecl
     P.<?> "declaration"
 

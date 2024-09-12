@@ -2,7 +2,6 @@ module Lamb.AST
   ( Pattern,
     Decl (..),
     Def (..),
-    LambdaDef (..),
     Expr (..),
     TopLevel (..),
   )
@@ -14,13 +13,10 @@ import Data.Text (Text)
 
 type Pattern = [(Maybe Expr, Expr, Maybe Expr)]
 
-data Decl = Decl (Text, Pattern) [(Expr, Pattern)]
+data Decl = Decl (Text, Pattern) [(Pattern, Pattern)]
   deriving (Read, Show, Eq)
 
 data Def = Def Decl Expr
-  deriving (Read, Show, Eq)
-
-data LambdaDef = LambdaDef (NonEmpty (Expr, Pattern)) Expr
   deriving (Read, Show, Eq)
 
 data Expr
@@ -100,7 +96,7 @@ data Expr
   | DivideAssign Expr Expr
   | ModuloAssign Expr Expr
   | -- prec -1
-    Lambda LambdaDef
+    Lambda (NonEmpty (Pattern, Pattern)) Expr
   deriving (Show, Eq, Read)
 
 data TopLevel
