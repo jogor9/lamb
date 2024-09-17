@@ -45,6 +45,7 @@ import Data.Char
 import Data.Foldable
 import Data.Function
 import Data.Functor
+import qualified Data.HashMap.Strict as Map
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HSet
 import Data.List.NonEmpty (NonEmpty (..))
@@ -131,11 +132,11 @@ charLiteral =
       fmap CharLiteral $
         P.satisfy (`notElem` ['\\', '\'']) P.<|> escapeSequence '\''
 
-stringLiteral :: Parser Expr
-stringLiteral =
+stringLiteralText :: Parser Text
+stringLiteralText =
   P.label "string literal" . lexeme $
     P.between (P.char '"') (P.char '"') $
-      StringLiteral . fold
+      fold
         <$> P.many
           ( P.takeWhile1P
               (Just "character or escape sequence")
@@ -143,16 +144,22 @@ stringLiteral =
               P.<|> (T.singleton <$> escapeSequence '"')
           )
 
-rawStringLiteral :: Parser Expr
-rawStringLiteral =
+stringLiteral :: Parser Expr
+stringLiteral = StringLiteral <$> stringLiteralText
+
+rawStringLiteralText :: Parser Text
+rawStringLiteralText =
   P.label "string literal" . lexeme $
     P.between (P.string "\"\"\"") (P.string "\"\"\"") $
-      StringLiteral . fold
+      fold
         <$> P.many
           ( P.takeWhile1P Nothing (/= '"')
               P.<|> P.tokens (/=) "\"\""
               P.<|> P.tokens (/=) "\"\"\""
           )
+
+rawStringLiteral :: Parser Expr
+rawStringLiteral = StringLiteral <$> rawStringLiteralText
 
 unsafeReadHex :: (Eq a, Num a) => String -> a
 unsafeReadHex =
@@ -199,7 +206,7 @@ numeral =
 semi, comma, arrow, bar, doubleDot, colon, equals, act, while, given :: Parser ()
 semi = void $ symbol ";"
 comma = void $ symbol ","
-arrow = void $ P.label "arrow" $ operator "->"
+arrow = void $ operator "->"
 bar = void $ operator "|"
 doubleDot = void $ operator ".."
 colon = void $ operator ":"
@@ -252,11 +259,11 @@ list =
 dict :: Parser Expr
 dict =
   P.label "dictionary" . braces $
-    Dict
+    Dict . Map.fromList
       <$> ( (,)
-              <$> ( name
-                      P.<|> stringLiteral
-                      P.<|> rawStringLiteral
+              <$> ( nameText
+                      P.<|> stringLiteralText
+                      P.<|> rawStringLiteralText
                   )
               <* colon
               <*> expr
@@ -273,8 +280,8 @@ anyOperator =
         ("!=", NotEquals),
         (":=", Assign),
         -- assignments conflict with their operators
-        ("-=", MinusAssign),
         ("-", Minus),
+        ("-=", MinusAssign),
         ("*=", TimesAssign),
         ("*", Times),
         ("/=", DivideAssign),
@@ -345,6 +352,8 @@ keywords =
       "else",
       "do",
       "while",
+      "true",
+      "false",
       "let",
       "case"
     ]
@@ -374,10 +383,14 @@ hole =
       <$ P.char '_'
       <* P.takeWhileP Nothing (\x -> isAlphaNum x || x == '_')
 
+boolLiteral :: Parser Expr
+boolLiteral = fmap BoolLiteral $ True <$ symbol "true" P.<|> False <$ symbol "false"
+
 primaryTerm :: Parser Expr
 primaryTerm =
   P.choice
-    [ name,
+    [ boolLiteral,
+      name,
       hole,
       numeral,
       list,
@@ -543,7 +556,6 @@ pattern =
       <*> P.optional (bar *> expr)
   )
     `P.sepBy1` comma
-    <&> toList
     P.<?> "pattern match"
 
 typeSpec :: Parser Pattern
@@ -552,19 +564,19 @@ typeSpec = colon *> patternTerm P.<?> "type pattern"
 patternTerm :: Parser Pattern
 patternTerm =
   parens pattern
-    P.<|> ((\t -> [(Nothing, t, Nothing)]) <$> primaryTerm)
+    P.<|> ((\t -> (Nothing, t, Nothing) :| []) <$> primaryTerm)
     P.<?> "pattern"
 
-argDecl :: Parser (Pattern, Pattern)
-argDecl = (,) <$> patternTerm <*> P.option [] typeSpec
+argDecl :: Parser (Pattern, Maybe Pattern)
+argDecl = (,) <$> patternTerm <*> P.optional typeSpec
 
-lamArgs :: Parser (NonEmpty (Pattern, Pattern))
+lamArgs :: Parser (NonEmpty (Pattern, Maybe Pattern))
 lamArgs = P.some argDecl
 
 decl :: Parser Decl
 decl =
   Decl
-    <$> ((,) <$> nameText <*> P.option [] typeSpec)
+    <$> ((,) <$> nameText <*> P.optional typeSpec)
     <*> P.many argDecl
     P.<?> "declaration"
 
@@ -581,6 +593,63 @@ prefixSection op cons = prefix op (Hole `cons`)
 
 postfixSection :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
 postfixSection op cons = postfix op (`cons` Hole)
+
+-- data Assoc
+--   = AssocLeft
+--   | AssocRight
+--   | AssocNone
+--   | AssocPref
+--   | AssocPost
+--
+-- data Op = Op
+--   { opName :: Text,
+--     opAssoc :: Assoc,
+--     opPrec :: Int
+--   }
+--
+-- operators :: [Op]
+-- operators =
+--   [ Op {opName = ".", opAssoc = AssocLeft, opPrec = 15},
+--     Op {opName = "@", opAssoc = AssocLeft, opPrec = 15},
+--     Op {opName = "^", opAssoc = AssocRight, opPrec = 14},
+--     Op {opName = "-", opAssoc = AssocPref, opPrec = 13},
+--     Op {opName = "*", opAssoc = AssocLeft, opPrec = 12},
+--     Op {opName = "/", opAssoc = AssocLeft, opPrec = 12},
+--     Op {opName = "%", opAssoc = AssocLeft, opPrec = 12},
+--     Op {opName = "+", opAssoc = AssocLeft, opPrec = 11},
+--     Op {opName = "-", opAssoc = AssocLeft, opPrec = 11},
+--     Op {opName = "++", opAssoc = AssocLeft, opPrec = 10},
+--     Op {opName = "?", opAssoc = AssocNone, opPrec = 9},
+--     Op {opName = "==", opAssoc = AssocLeft, opPrec = 8},
+--     Op {opName = "!=", opAssoc = AssocLeft, opPrec = 8},
+--     Op {opName = "<", opAssoc = AssocLeft, opPrec = 8},
+--     Op {opName = ">", opAssoc = AssocLeft, opPrec = 8},
+--     Op {opName = "<=", opAssoc = AssocLeft, opPrec = 8},
+--     Op {opName = ">=", opAssoc = AssocLeft, opPrec = 8},
+--     Op {opName = "&&", opAssoc = AssocLeft, opPrec = 7},
+--     Op {opName = "||", opAssoc = AssocLeft, opPrec = 7},
+--     Op {opName = "&>", opAssoc = AssocLeft, opPrec = 6},
+--     Op {opName = "^>", opAssoc = AssocLeft, opPrec = 6},
+--     Op {opName = "<&", opAssoc = AssocRight, opPrec = 5},
+--     Op {opName = "<^", opAssoc = AssocRight, opPrec = 5},
+--     Op {opName = "<&>", opAssoc = AssocLeft, opPrec = 4},
+--     Op {opName = "|>", opAssoc = AssocLeft, opPrec = 3},
+--     Op {opName = "@>", opAssoc = AssocLeft, opPrec = 3},
+--     Op {opName = "?>", opAssoc = AssocLeft, opPrec = 3},
+--     Op {opName = "<|", opAssoc = AssocRight, opPrec = 2},
+--     Op {opName = "<@", opAssoc = AssocRight, opPrec = 2},
+--     Op {opName = "<?", opAssoc = AssocRight, opPrec = 2},
+--     Op {opName = "<|>", opAssoc = AssocLeft, opPrec = 1},
+--     Op {opName = ":=", opAssoc = AssocRight, opPrec = 0},
+--     Op {opName = "+=", opAssoc = AssocRight, opPrec = 0},
+--     Op {opName = "-=", opAssoc = AssocRight, opPrec = 0},
+--     Op {opName = "*=", opAssoc = AssocRight, opPrec = 0},
+--     Op {opName = "/=", opAssoc = AssocRight, opPrec = 0},
+--     Op {opName = "%=", opAssoc = AssocRight, opPrec = 0}
+--   ]
+--
+-- access :: Parser Expr
+-- access = foldl' (&) <$> primaryTerm <*> P.many ((operator "." $> flip NameAccess P.<|> operator "@" $> flip IndexAccess) <*> primaryTerm)
 
 operatorTable :: [[Operator Parser Expr]]
 operatorTable =

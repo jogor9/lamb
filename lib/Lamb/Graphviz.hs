@@ -13,6 +13,7 @@ import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as BSB
 import Data.Foldable
 import Data.Functor
+import qualified Data.HashMap.Strict as Map
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text.Encoding as T
 import Lamb.AST
@@ -67,16 +68,16 @@ patternToGraphviz =
               <> toList ((,[("label", "condition")]) . exprToGraphviz <$> cond)
       )
 
-argDeclToGraphviz :: (Pattern, Pattern) -> GraphvizStep
+argDeclToGraphviz :: (Pattern, Maybe Pattern) -> GraphvizStep
 argDeclToGraphviz (valPat, typePat) =
-  plainNode "(x)" [] [patternToGraphviz valPat, patternToGraphviz typePat]
+  plainNode "(x)" [] $ [patternToGraphviz valPat] <> fmap patternToGraphviz (toList typePat)
 
 declToGraphviz :: Decl -> GraphvizStep
 declToGraphviz (Decl (nm, pat) args) =
   plainNode "f : x" [] $
-    [ exprToGraphviz $ Name nm,
-      patternToGraphviz pat
+    [ exprToGraphviz $ Name nm
     ]
+      <> fmap patternToGraphviz (toList pat)
       <> map argDeclToGraphviz args
 
 defToGraphviz :: Def -> GraphvizStep
@@ -93,16 +94,20 @@ exprToGraphviz = \case
       [(exprToGraphviz start, [("label", "start")])]
         <> toList ((,[("label", "step")]) . exprToGraphviz <$> maybeStep)
         <> toList ((,[("label", "last")]) . exprToGraphviz <$> maybeLast)
+  BoolLiteral b ->
+    if b
+      then plainNode "true" [] []
+      else plainNode "false" [] []
   Dict kv ->
-    plainNode "{}" [] $
-      map
+    plainNode "{}" []
+      $ map
         ( \(k, v) ->
             plainNode
               "{}"
               []
-              [exprToGraphviz k, exprToGraphviz v]
+              [exprToGraphviz $ StringLiteral k, exprToGraphviz v]
         )
-        kv
+      $ Map.toList kv
   Tuple a b ->
     plainNode
       ","

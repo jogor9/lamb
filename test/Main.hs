@@ -250,14 +250,14 @@ dicts =
   map
     (second Dict)
     [ ("{}", []),
-      ("{foo: \"bar\"}", [(Name "foo", StringLiteral "bar")]),
+      ("{foo: \"bar\"}", [("foo", StringLiteral "bar")]),
       ( "{foo: 42, bar: 69, }",
-        [ (Name "foo", Numeral 42),
-          (Name "bar", Numeral 69)
+        [ ("foo", Numeral 42),
+          ("bar", Numeral 69)
         ]
       ),
       ( "{\"\\\\45\\xfe\\\"\": { foo: bar }}",
-        [(StringLiteral "\\45\xfe\"", Dict [(Name "foo", Name "bar")])]
+        [("\\45\xfe\"", Dict [("foo", Name "bar")])]
       )
     ]
 
@@ -293,18 +293,18 @@ sections =
 
 parenLambdaTerms :: [(Text, Expr)]
 parenLambdaTerms =
-  [ ("(a -> b)", Lambda [([(Nothing, Name "a", Nothing)], [])] (Name "b")),
+  [ ("(a -> b)", Lambda [([(Nothing, Name "a", Nothing)], Nothing)] (Name "b")),
     ( "(_ b -> c)",
       Lambda
-        [ ([(Nothing, Hole, Nothing)], []),
-          ([(Nothing, Name "b", Nothing)], [])
+        [ ([(Nothing, Hole, Nothing)], Nothing),
+          ([(Nothing, Name "b", Nothing)], Nothing)
         ]
         (Name "c")
     ),
     ( "(a : 42 b : int -> c)",
       Lambda
-        [ ([(Nothing, Name "a", Nothing)], [(Nothing, Numeral 42, Nothing)]),
-          ([(Nothing, Name "b", Nothing)], [(Nothing, Name "int", Nothing)])
+        [ ([(Nothing, Name "a", Nothing)], Just [(Nothing, Numeral 42, Nothing)]),
+          ([(Nothing, Name "b", Nothing)], Just [(Nothing, Name "int", Nothing)])
         ]
         (Name "c")
     )
@@ -312,18 +312,18 @@ parenLambdaTerms =
 
 lambdaTerms :: [(Text, Expr)]
 lambdaTerms =
-  [ ("\\a -> b", Lambda [([(Nothing, Name "a", Nothing)], [])] (Name "b")),
+  [ ("\\a -> b", Lambda [([(Nothing, Name "a", Nothing)], Nothing)] (Name "b")),
     ( "\\_ b -> c",
       Lambda
-        [ ([(Nothing, Hole, Nothing)], []),
-          ([(Nothing, Name "b", Nothing)], [])
+        [ ([(Nothing, Hole, Nothing)], Nothing),
+          ([(Nothing, Name "b", Nothing)], Nothing)
         ]
         (Name "c")
     ),
     ( "\\a : 42 b : int -> c",
       Lambda
-        [ ([(Nothing, Name "a", Nothing)], [(Nothing, Numeral 42, Nothing)]),
-          ([(Nothing, Name "b", Nothing)], [(Nothing, Name "int", Nothing)])
+        [ ([(Nothing, Name "a", Nothing)], Just [(Nothing, Numeral 42, Nothing)]),
+          ([(Nothing, Name "b", Nothing)], Just [(Nothing, Name "int", Nothing)])
         ]
         (Name "c")
     )
@@ -381,13 +381,13 @@ doWhileExprs =
 
 decls :: [(Text, Decl)]
 decls =
-  [ ("a", Decl ("a", []) []),
-    ("a : pat", Decl ("a", [(Nothing, Name "pat", Nothing)]) []),
-    ("a b", Decl ("a", []) [([(Nothing, Name "b", Nothing)], [])]),
+  [ ("a", Decl ("a", Nothing) []),
+    ("a : pat", Decl ("a", Just [(Nothing, Name "pat", Nothing)]) []),
+    ("a b", Decl ("a", Nothing) [([(Nothing, Name "b", Nothing)], Nothing)]),
     ( "a : pat b : pat",
       Decl
-        ("a", [(Nothing, Name "pat", Nothing)])
-        [([(Nothing, Name "b", Nothing)], [(Nothing, Name "pat", Nothing)])]
+        ("a", Just [(Nothing, Name "pat", Nothing)])
+        [([(Nothing, Name "b", Nothing)], Just [(Nothing, Name "pat", Nothing)])]
     )
   ]
 
@@ -671,7 +671,7 @@ main = hspec $ do
       parse expr "a ? b ?> ? c ?> ? d" `shouldReturn` Bind (Bind (MemberOf (Name "a") (Name "b")) (MemberOf Hole (Name "c"))) (MemberOf Hole (Name "d"))
     it "correctly parses complex pipelines" $ do
       -- data |> (    sort &> group &> map length &> sum
-      --          <&> find "val" &> || 42               ) |> uncurry (==)
+      --          <&> find "val" &> _ || 42               ) |> uncurry (==)
       parse expr "data |> (sort &> group &> map length &> sum <&> find \"val\" &> || 42) |> uncurry (==)"
         `shouldReturn` ( Pipe
                            (Name "data")
@@ -716,11 +716,3 @@ main = hspec $ do
               r <- read <$> readFile spec
               (T.readFile file >>= parse program) `shouldReturn` r
           )
-
--- describe "Lamb.Parser.expr" $ do
---   it "correctly parses various expressions" $ do
--- foldr _ z xs <| \x -> {
---
--- }
--- map ((f _ y) x) : Application (Name "map") (Application (Application (Name "f") Hole) (Name "x"))
--- x |> case _ ->

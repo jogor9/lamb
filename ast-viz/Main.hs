@@ -18,6 +18,6 @@ main = do
       BSB.hPutBuilder stdout $
         programToGraphviz
           [("fontname", "Noto Sans")]
-          [("shape", "plaintext")]
-          [("arrowhead", "none")]
+          [("fontname", "Noto Sans"), ("shape", "plaintext")]
+          [("fontname", "Noto Sans"), ("arrowhead", "none")]
           toplevel
